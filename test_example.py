@@ -25,6 +25,6 @@ def test_failed():
     """Тест, который ожидаемо падает."""
     assert False
 
-
+#1
 if __name__ == "__main__":
     pytest.main(["-v", "--alluredir=allure-results"])
