@@ -1,55 +1,56 @@
-# Базовый образ Jenkins
-FROM jenkins/jenkins:lts
+FROM python:3.11-slim
 
-# Переключаемся на root для установки зависимостей
-USER root
-
-# Установка tini, Python, Java и других зависимостей
+# Установка системных зависимостей
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    tini \
-    python3 \
-    python3-pip \
-    python3-venv \
-    curl \
-    openjdk-17-jre-headless \
-    docker.io \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    wget \
+    unzip \
+    openjdk-17-jre-headless && \
+    rm -rf /var/lib/apt/lists/*
+
+# Установка Chrome с фиксом ключей
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ca-certificates \
+    gnupg && \
+    # Добавляем ключ через стандартный механизм
+    mkdir -p /etc/apt/keyrings && \
+    wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /etc/apt/keyrings/google-chrome.gpg && \
+    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+    google-chrome-stable && \
+    rm -rf /var/lib/apt/lists/*
+
+# Настройка переменных окружения
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
+
+# Проверка версий (опционально)
+RUN google-chrome --version
 
 # Установка Allure
-ARG ALLURE_VERSION=2.30.0
-RUN curl -o allure-${ALLURE_VERSION}.tgz -Ls https://github.com/allure-framework/allure2/releases/download/${ALLURE_VERSION}/allure-${ALLURE_VERSION}.tgz && \
-    tar -zxvf allure-${ALLURE_VERSION}.tgz -C /opt/ && \
-    ln -s /opt/allure-${ALLURE_VERSION}/bin/allure /usr/bin/allure && \
-    rm allure-${ALLURE_VERSION}.tgz
+ARG ALLURE_VERSION=2.24.1
+RUN wget -O allure-${ALLURE_VERSION}.tgz \
+    https://repo.maven.apache.org/maven2/io/qameta/allure/allure-commandline/${ALLURE_VERSION}/allure-commandline-${ALLURE_VERSION}.tgz \
+    && tar -zxvf allure-${ALLURE_VERSION}.tgz -C /opt/ \
+    && ln -s /opt/allure-${ALLURE_VERSION}/bin/allure /usr/bin/allure \
+    && rm allure-${ALLURE_VERSION}.tgz
 
-# Создание рабочей директории для тестов
+# Рабочая директория
 WORKDIR /app
 
-# Создание виртуального окружения
-RUN python3 -m venv /app/venv
+# Копируем зависимости и устанавливаем их
+COPY tests/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Копирование файлов проекта
-COPY requirements.txt .
-# Установка зависимостей в виртуальное окружение
-RUN /app/venv/bin/pip install --no-cache-dir -r requirements.txt
+# Копируем тесты
+COPY tests/ .
 
-COPY test_example.py .
+# Создание директорий для Allure
+RUN mkdir -p /app/allure-results /app/allure-report /app/.pytest_cache \
+    && chmod -R 777 /app/allure-results
 
-# Создание директорий для Allure и установка прав
-RUN mkdir -p /app/allure-results /app/allure-report /app/.pytest_cache && \
-    chown -R jenkins:jenkins /app && \
-    chmod -R 777 /app
-
-# Точка монтирования для отчётов
 VOLUME /app/allure-report
 
-# Возвращаемся к пользователю Jenkins
-USER jenkins
-
-# Экспонируем порт Jenkins
-EXPOSE 8089 50000
-
-# Команда по умолчанию для запуска Jenkins с tini
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/jenkins.sh"]
+CMD ["pytest", "test_example.py", "-v", "--alluredir=/app/allure-results"]

@@ -1,6 +1,20 @@
 import pytest
 import requests
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options  
 
+def test_selenium_in_docker():
+    # Настройка опций Chrome
+    options = Options()
+    options.add_argument("--headless")  # Режим без GUI
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    
+    # Создание драйвера
+    driver = webdriver.Chrome(options=options)
+    driver.get("https://www.google.com")
+    assert "Google" in driver.title
+    driver.quit()
 
 def test_get_status_code_200():
     """Проверка, что GET-запрос возвращает статус 200."""
