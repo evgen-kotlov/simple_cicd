@@ -20,7 +20,7 @@ def test_selenium():
     finally:
         driver.quit()
 
-
+#1
 def test_get_status_code_200():
     response = requests.get("https://httpstat.us/200")
     assert response.status_code == 200
