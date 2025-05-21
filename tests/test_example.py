@@ -29,6 +29,6 @@ def test_post_status_code_200():
     response = requests.post("https://httpstat.us/200", json={"key": "value"})
     assert response.status_code == 200
 
-@pytest.mark.skip(reason="Пример пропущенного теста4")
+@pytest.mark.skip(reason="Пример пропущенного теста5")
 def test_skipped():
     assert False
